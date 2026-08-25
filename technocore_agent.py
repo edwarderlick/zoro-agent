@@ -69,7 +69,8 @@ DIRECT_HELP_KEYWORDS = (
     "confused",
     "new here",
     "assistance",
-    "lost",
+    "i am lost",
+    "i'm lost",
     "explain",
     "guide me",
     "what do i do",
@@ -312,22 +313,23 @@ def fetch_room_messages(
 def is_asking_for_help(text: str) -> bool:
     """
     Check if a message indicates the sender needs help or is inquiring about the ecosystem.
-    Converts text to lowercase and returns True if it matches ANY of the help conditions,
-    while immediately filtering out known bot announcements.
+    Strips out URLs to avoid false positives on '?' in query strings, converts to lowercase,
+    and returns True if it matches help conditions while filtering out known bot announcements.
     """
-    lower_text = text.lower()
+    # Strip any URLs (http:// or https://) to avoid false positives from URL query parameters (e.g. ?s=20)
+    cleaned_text = re.sub(r"https?://\S+", "", text).lower()
 
     # Negative filter: immediately ignore known bot broadcasts / reports
-    if any(phrase in lower_text for phrase in NEGATIVE_FILTER_PHRASES):
+    if any(phrase in cleaned_text for phrase in NEGATIVE_FILTER_PHRASES):
         return False
 
     # Condition 1: Direct cries for help ('help me', 'need help', 'stuck', etc.)
-    if any(keyword in lower_text for keyword in DIRECT_HELP_KEYWORDS):
+    if any(keyword in cleaned_text for keyword in DIRECT_HELP_KEYWORDS):
         return True
 
     # Condition 2: Question about the ecosystem
-    has_question = any(q in lower_text for q in QUESTION_INDICATORS)
-    has_ecosystem = any(eco in lower_text for eco in ECOSYSTEM_KEYWORDS)
+    has_question = any(q in cleaned_text for q in QUESTION_INDICATORS)
+    has_ecosystem = any(eco in cleaned_text for eco in ECOSYSTEM_KEYWORDS)
     if has_question and has_ecosystem:
         return True
 
