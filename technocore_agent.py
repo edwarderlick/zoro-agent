@@ -55,9 +55,16 @@ MESSAGE_REGEX = re.compile(
     r"^\[(?P<id>\d+)\]\s+(?P<timestamp>\S+)\s+<(?P<sender>[^>]+)>\s*(?P<text>.*)$"
 )
 
+# Negative filter phrases to ignore bot broadcasts and false positives
+NEGATIVE_FILTER_PHRASES = (
+    "this agent is preparing",
+    "reproducible signed-message",
+)
+
 # Direct cries for help (case-insensitive)
 DIRECT_HELP_KEYWORDS = (
-    "help",
+    "help me",
+    "need help",
     "stuck",
     "confused",
     "new here",
@@ -305,15 +312,16 @@ def fetch_room_messages(
 def is_asking_for_help(text: str) -> bool:
     """
     Check if a message indicates the sender needs help or is inquiring about the ecosystem.
-    Converts text to lowercase and returns True if it matches ANY of these conditions:
-    1. Direct cries for help: 'help', 'stuck', 'confused', 'new here', 'assistance',
-       'lost', 'explain', 'guide me', 'what do i do', 'noob', 'beginner'.
-    2. Ecosystem question: (contains '?' OR 'how' OR 'what' OR 'where')
-       AND (contains 'did', 'airdrop', 'flop', 'key', 'sign', 'technocore', 'network', 'protocol').
+    Converts text to lowercase and returns True if it matches ANY of the help conditions,
+    while immediately filtering out known bot announcements.
     """
     lower_text = text.lower()
 
-    # Condition 1: Direct cries for help
+    # Negative filter: immediately ignore known bot broadcasts / reports
+    if any(phrase in lower_text for phrase in NEGATIVE_FILTER_PHRASES):
+        return False
+
+    # Condition 1: Direct cries for help ('help me', 'need help', 'stuck', etc.)
     if any(keyword in lower_text for keyword in DIRECT_HELP_KEYWORDS):
         return True
 
