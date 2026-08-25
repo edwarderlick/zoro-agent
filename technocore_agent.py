@@ -55,14 +55,32 @@ MESSAGE_REGEX = re.compile(
     r"^\[(?P<id>\d+)\]\s+(?P<timestamp>\S+)\s+<(?P<sender>[^>]+)>\s*(?P<text>.*)$"
 )
 
-# Target phrases to listen for (case-insensitive)
-TARGET_PHRASES = (
-    "test",
-    "how do i",
-    "what is this",
-    "how to get airdrop",
-    "how does this work",
+# Direct cries for help (case-insensitive)
+DIRECT_HELP_KEYWORDS = (
+    "help",
+    "stuck",
     "confused",
+    "new here",
+    "assistance",
+    "lost",
+    "explain",
+    "guide me",
+    "what do i do",
+    "noob",
+    "beginner",
+)
+
+# Question indicators & Ecosystem keywords for contextual help requests
+QUESTION_INDICATORS = ("?", "how", "what", "where")
+ECOSYSTEM_KEYWORDS = (
+    "did",
+    "airdrop",
+    "flop",
+    "key",
+    "sign",
+    "technocore",
+    "network",
+    "protocol",
 )
 
 # Global cached private key
@@ -284,15 +302,28 @@ def fetch_room_messages(
         return [], f"Network error: {exc}"
 
 
-def matches_target(text: str) -> Optional[str]:
+def is_asking_for_help(text: str) -> bool:
     """
-    Check if text contains any of the target phrases (case-insensitive).
+    Check if a message indicates the sender needs help or is inquiring about the ecosystem.
+    Converts text to lowercase and returns True if it matches ANY of these conditions:
+    1. Direct cries for help: 'help', 'stuck', 'confused', 'new here', 'assistance',
+       'lost', 'explain', 'guide me', 'what do i do', 'noob', 'beginner'.
+    2. Ecosystem question: (contains '?' OR 'how' OR 'what' OR 'where')
+       AND (contains 'did', 'airdrop', 'flop', 'key', 'sign', 'technocore', 'network', 'protocol').
     """
-    normalized_text = text.lower()
-    for phrase in TARGET_PHRASES:
-        if phrase in normalized_text:
-            return phrase
-    return None
+    lower_text = text.lower()
+
+    # Condition 1: Direct cries for help
+    if any(keyword in lower_text for keyword in DIRECT_HELP_KEYWORDS):
+        return True
+
+    # Condition 2: Question about the ecosystem
+    has_question = any(q in lower_text for q in QUESTION_INDICATORS)
+    has_ecosystem = any(eco in lower_text for eco in ECOSYSTEM_KEYWORDS)
+    if has_question and has_ecosystem:
+        return True
+
+    return False
 
 
 # ---------------------------------------------------------
@@ -301,7 +332,7 @@ def matches_target(text: str) -> Optional[str]:
 def run_agent(room: str = DEFAULT_ROOM, poll_interval: int = POLL_INTERVAL_SECONDS) -> None:
     """
     Run the autonomous agent polling loop in the background.
-    Fetches new messages every `poll_interval` seconds, detects target phrases,
+    Fetches new messages every `poll_interval` seconds, detects users asking for help,
     posts signed guide responses, and tracks helped users in memory.
     """
     print("=" * 70)
@@ -309,7 +340,7 @@ def run_agent(room: str = DEFAULT_ROOM, poll_interval: int = POLL_INTERVAL_SECON
     print(f"[*] DID: {MY_DID}")
     print(f"[*] Target Room: {BASE_URL}/r/{room}")
     print(f"[*] Polling Interval: {poll_interval}s")
-    print(f"[*] Monitored Phrases: {list(TARGET_PHRASES)}")
+    print("[*] Help Detection: Advanced heuristic (direct cries + ecosystem questions)")
     print("=" * 70)
 
     # Pre-load private key at agent startup
@@ -365,9 +396,8 @@ def run_agent(room: str = DEFAULT_ROOM, poll_interval: int = POLL_INTERVAL_SECON
                     if sender.lower() == "zoro" or sender == AGENT_NAME or sender in helped_users:
                         continue
 
-                    # Check if message text matches any target phrase (case-insensitive)
-                    matched = matches_target(msg.text)
-                    if matched:
+                    # Check if message indicates the user is asking for help
+                    if is_asking_for_help(msg.text):
                         print(f"TARGET FOUND: {sender} - {msg.text}")
 
                         # Format Zoro The Guide's response message
